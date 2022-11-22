@@ -47,37 +47,26 @@ namespace BTCPayServer.HostedServices
                     // find all wallet objects that fit this transaction
                     // that means see if there are any utxo objects that match in/outs and scripts/addresses that match outs
                     var matchedObjects = transactionEvent.NewTransactionEvent.TransactionData.Transaction.Inputs
-                        .Select(txIn => new OnChainWalletObjectId()
-                        {
-                            Id = txIn.PrevOut.ToString(), Type = WalletObjectData.Types.Utxo
-                        })
+                        .Select(txIn => new ObjectTypeId(WalletObjectData.Types.Utxo, txIn.PrevOut.ToString()))
                         .Concat(transactionEvent.NewTransactionEvent.TransactionData.Transaction.Outputs.AsIndexedOutputs().SelectMany(txOut =>
                            
                             new[]{
-                            new OnChainWalletObjectId()
-                            {
-                                Id = txOut.TxOut.ScriptPubKey.ToString(), Type = WalletObjectData.Types.Script
-                            },
-                            new OnChainWalletObjectId()
-                            {
-                                Id = txOut.ToCoin().Outpoint.ToString(), Type = WalletObjectData.Types.Utxo
-                            }
+                            new ObjectTypeId(WalletObjectData.Types.Script,txOut.TxOut.ScriptPubKey.ToString()),
+                            new ObjectTypeId(WalletObjectData.Types.Utxo,txOut.ToCoin().Outpoint.ToString())
                             
                             } )).Distinct().ToArray();
                     
                     // we are intentionally excluding wallet id filter so that we reduce db trips
-                    var objs = await _walletRepository.GetWalletObjects(null,
-                        new OnChainWalletObjectQuery() {Ids = matchedObjects});
+                    var objs = await _walletRepository.GetWalletObjects(new GetWalletObjectsQuery(){TypesIds = matchedObjects});
 
-                    foreach (IGrouping<string, WalletObjectData> walletObjectDatas in objs.GroupBy(data => data.WalletId))
+                    foreach (var walletObjectDatas in objs.GroupBy(data => data.Key.WalletId))
                     {
-                        var txWalletObject = new WalletObjectId(WalletId.Parse(walletObjectDatas.Key),
+                        var txWalletObject = new WalletObjectId(walletObjectDatas.Key,
                             WalletObjectData.Types.Tx, txHash);
                         await _walletRepository.EnsureWalletObject(txWalletObject);
                         foreach (var walletObjectData in walletObjectDatas)
                         {
-                            await _walletRepository.EnsureWalletObjectLink(txWalletObject,
-                                new WalletObjectId(txWalletObject.WalletId, walletObjectData.Type, walletObjectData.Id));
+                            await _walletRepository.EnsureWalletObjectLink(txWalletObject, walletObjectData.Key);
                         }
                     }
 

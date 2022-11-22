@@ -37,8 +37,9 @@ namespace BTCPayServer.Services
             Type = type;
             Ids = ids;
         }
-        public GetWalletObjectsQuery(ObjectTypeId[]? typesIds)
+        public GetWalletObjectsQuery(WalletId? walletId,ObjectTypeId[]? typesIds)
         {
+            WalletId = walletId;
             TypesIds = typesIds;
         }
 
@@ -230,9 +231,28 @@ namespace BTCPayServer.Services
             }
         }
 #nullable restore
-        public async Task<Dictionary<string, WalletTransactionInfo>> GetWalletTransactionsInfo(WalletId walletId, string[] transactionIds = null)
+
+        public async Task<Dictionary<string, WalletTransactionInfo>> GetWalletTransactionsInfo(WalletId walletId,
+            string[] transactionIds = null)
         {
-            var wos = await GetWalletObjects((GetWalletObjectsQuery)(new(walletId, WalletObjectData.Types.Tx, transactionIds)));
+            var wos = await GetWalletObjects(
+                new GetWalletObjectsQuery(walletId, WalletObjectData.Types.Tx, transactionIds));
+            return await GetWalletTransactionsInfoCore(walletId, wos);
+        }
+
+        public async Task<Dictionary<string, WalletTransactionInfo>> GetWalletTransactionsInfo(WalletId walletId,
+            ObjectTypeId[] transactionIds = null)
+        {
+            var wos = await GetWalletObjects(
+                new GetWalletObjectsQuery(walletId, transactionIds));
+            
+            return await GetWalletTransactionsInfoCore(walletId, wos);
+        }
+
+        private async Task<Dictionary<string, WalletTransactionInfo>> GetWalletTransactionsInfoCore(WalletId walletId,
+            Dictionary<WalletObjectId, WalletObjectData> wos)
+        {
+       
             var result = new Dictionary<string, WalletTransactionInfo>(wos.Count);
             foreach (var obj in wos.Values)
             {

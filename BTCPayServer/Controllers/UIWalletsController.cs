@@ -578,7 +578,14 @@ namespace BTCPayServer.Controllers
                 var utxos = await _walletProvider.GetWallet(network)
                     .GetUnspentCoins(schemeSettings.AccountDerivation, false, cancellation);
 
-                var walletTransactionsInfoAsync = await this.WalletRepository.GetWalletTransactionsInfo(walletId, utxos.SelectMany(u => new []{u.OutPoint.Hash.ToString(), u.ScriptPubKey.ToString()}).Distinct().ToArray());
+                var walletTransactionsInfoAsync = await this.WalletRepository.GetWalletTransactionsInfo(walletId, 
+                    utxos.SelectMany(u => new []
+                    {
+                        new ObjectTypeId(WalletObjectData.Types.Tx, u.OutPoint.Hash.ToString()),
+                        new ObjectTypeId(WalletObjectData.Types.Script,  u.ScriptPubKey.ToString()),
+                        new ObjectTypeId(WalletObjectData.Types.Utxo,  u.OutPoint.ToString()),
+                       }
+                    ).Distinct().ToArray());
                 vm.InputsAvailable = utxos.Select(coin =>
                 {
                     walletTransactionsInfoAsync.TryGetValue(coin.OutPoint.Hash.ToString(), out var info);
@@ -1297,7 +1304,7 @@ namespace BTCPayServer.Controllers
                 return NotFound();
             
             var wallet = _walletProvider.GetWallet(paymentMethod.Network);
-            var walletTransactionsInfoAsync = WalletRepository.GetWalletTransactionsInfo(walletId);
+            var walletTransactionsInfoAsync = WalletRepository.GetWalletTransactionsInfo(walletId, (string[] ) null);
             var input = await wallet.FetchTransactionHistory(paymentMethod.AccountDerivation, null, null);
             var walletTransactionsInfo = await walletTransactionsInfoAsync;
             var export = new TransactionsExport(wallet, walletTransactionsInfo);
